@@ -24,4 +24,3 @@ print(train_data*255)
 print(train_label)
 print(train_data[0, :, 1])
 
-a = 123
