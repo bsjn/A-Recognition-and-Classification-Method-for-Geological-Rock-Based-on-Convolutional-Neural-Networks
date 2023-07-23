@@ -2,9 +2,10 @@ import os
 import cv2
 import numpy as np
 from sklearn.model_selection import train_test_split
+import tensorflow as tf
 
 # 图像文件夹路径
-data_dir = "F:\Rocks"
+data_dir = "F:\Rocks"       # 项目成员根据自己的路径调试
 
 # 加载图像数据和标签
 images = []
@@ -46,8 +47,37 @@ datagen = ImageDataGenerator(
 datagen.fit(train_images)
 
 r_channel_image_1 = images[0, :, :, 0]  # 读取第一张图片R通道的像素值（100*100）
-print(r_channel_image_1)
+
+# print(r_channel_image_1)
 
 # 此时，train_images 和 val_images 用于训练和验证 CNN 模型的输入，train_labels 和 val_labels 是相应的标签。
+
+
+class ConvolutionLayer(tf.keras.layers.Layer):      # 卷积层
+
+    def __init__(self, num_filters, kernel_size, input_channels):   # 参数：卷积核数，卷积核大小，输入通道数
+        super(ConvolutionLayer, self).__init__()
+        self.num_filters = num_filters
+        self.kernel_size = kernel_size
+        self.input_channels = input_channels
+
+        self.conv_layer = tf.keras.layers.Conv2D(
+            filters=num_filters,
+            kernel_size=kernel_size,
+            strides=(1, 1),
+            padding='valid',
+            activation='relu',
+            input_shape=(None, None, input_channels)
+        )
+
+    def call(self, inputs):
+        output = self.conv_layer(inputs)
+        return output
+
+# 测试
+
+conv_layer = ConvolutionLayer(num_filters=3, kernel_size=3, input_channels=3)
+output_data = conv_layer(train_images)
+
 
 
