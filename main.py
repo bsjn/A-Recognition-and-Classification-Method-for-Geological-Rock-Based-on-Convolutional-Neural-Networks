@@ -1,26 +1,53 @@
+import os
+import cv2
 import numpy as np
-import tensorflow as tf
+from sklearn.model_selection import train_test_split
 
-class MNISTLoader():
-    def __init__(self):
-        mnist = tf.keras.datasets.mnist
-        (self.train_data,self.train_label),(self.test_data,self.test_label) = mnist.load_data()
-        # MNIST中的图像默认为uint8（0-255的数字）。以下代码将其归一化到0-1之间的浮点数，并在最后增加一维作为颜色通道RGB，如果没有这个维度就是灰度的图片，没有彩色。
-        self.train_data = np.expand_dims(self.train_data.astype(np.float)/255.0,axis=-1)            # [60000, 28, 28, 1]
-        self.test_data = np.expand_dims(self.test_data.astype(np.float32) / 255.0, axis=-1)        # [10000, 28, 28, 1]
-        self.train_label = self.train_label.astype(np.int32)    # [60000]
-        self.test_label = self.test_label.astype(np.int32)      # [10000]
-        self.num_train_data, self.num_test_data = self.train_data.shape[0], self.test_data.shape[0]   #60000,10000
+# 图像文件夹路径
+data_dir = "F:\Rocks"
 
-    def get_batch(self, batch_size):
-        # 从数据集中随机取出batch_size个元素并返回
-        index = np.random.randint(0, self.num_train_data, batch_size)  #可以重复取某条数据
-        return self.train_data[index, :], self.train_label[index]
+# 加载图像数据和标签
+images = []
+labels = []
 
-mnist = MNISTLoader()
-batch_size = 1
-train_data, train_label = mnist.get_batch(batch_size)
-print(train_data*255)
-print(train_label)
-print(train_data[0, :, 1])
+# 遍历每个类别文件夹
+for label, folder_name in enumerate(os.listdir(data_dir)):
+    folder_path = os.path.join(data_dir, folder_name)
+    for file_name in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, file_name)
+        # 读取图像并调整大小
+        image = cv2.imread(file_path)
+        image = cv2.resize(image, (100, 100))  # 调整为100x100像素
+        images.append(image)
+        labels.append(label)
+
+# 将图像数据和标签转换为NumPy数组
+images = np.array(images)
+labels = np.array(labels)
+
+# 归一化像素值到[0, 1]范围
+images = images.astype('float32') / 255.0
+
+# 划分训练集和验证集
+train_images, val_images, train_labels, val_labels = train_test_split(images, labels, test_size=0.2, random_state=42)
+
+# 进行数据增强（示例，根据需要可以增加更多变换）
+from keras.preprocessing.image import ImageDataGenerator
+
+datagen = ImageDataGenerator(
+    rotation_range=20,      # 随机旋转角度范围
+    width_shift_range=0.1,   # 随机水平平移范围
+    height_shift_range=0.1,  # 随机垂直平移范围
+    horizontal_flip=True,    # 水平翻转
+    zoom_range=0.1           # 随机缩放范围
+)
+
+# 对训练集数据进行增强
+datagen.fit(train_images)
+
+r_channel_image_1 = images[0, :, :, 0]  # 读取第一张图片R通道的像素值（100*100）
+print(r_channel_image_1)
+
+# 此时，train_images 和 val_images 用于训练和验证 CNN 模型的输入，train_labels 和 val_labels 是相应的标签。
+
 
