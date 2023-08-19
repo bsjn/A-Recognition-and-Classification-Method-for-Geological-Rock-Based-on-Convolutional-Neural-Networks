@@ -48,7 +48,7 @@ datagen.fit(train_images)
 
 r_channel_image_1 = images[0, :, :, 0]  # 读取第一张图片R通道的像素值（100*100）
 
-# print(r_channel_image_1)
+print(r_channel_image_1)
 
 # 此时，train_images 和 val_images 用于训练和验证 CNN 模型的输入，train_labels 和 val_labels 是相应的标签。
 
