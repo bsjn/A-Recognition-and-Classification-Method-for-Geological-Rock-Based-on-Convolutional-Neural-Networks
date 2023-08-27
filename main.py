@@ -1,83 +1,94 @@
-import os
-import cv2
-import numpy as np
-from sklearn.model_selection import train_test_split
+from data_processing import load_and_preprocess_data, get_r_channel_image
+from model import ConvolutionLayer, FullyConnectedLayer, ActivationLayer
 import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
 
-# 图像文件夹路径
-data_dir = "F:\Rocks"       # 项目成员根据自己的路径调试
+data_dir = "F:\Rocks_0"  # 设置正确的路径
 
-# 加载图像数据和标签
-images = []
-labels = []
+train_images, val_images, train_labels, val_labels = load_and_preprocess_data(data_dir)
 
-# 遍历每个类别文件夹
-for label, folder_name in enumerate(os.listdir(data_dir)):
-    folder_path = os.path.join(data_dir, folder_name)
-    for file_name in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, file_name)
-        # 读取图像并调整大小
-        image = cv2.imread(file_path)
-        image = cv2.resize(image, (100, 100))  # 调整为100x100像素
-        images.append(image)
-        labels.append(label)
+r_channel_image = get_r_channel_image(train_images)
 
-# 将图像数据和标签转换为NumPy数组
-images = np.array(images)
-labels = np.array(labels)
+# Build the model
+conv_layer = ConvolutionLayer(num_filters=32, kernel_size=3, input_channels=3)
+fully_connected_layer = FullyConnectedLayer(num_units=128, num_classes=7)
+activation_layer = ActivationLayer(activation_function='relu')
 
-# 归一化像素值到[0, 1]范围
-images = images.astype('float32') / 255.0
+# Create a forward pass
+inputs = tf.keras.Input(shape=(100, 100, 3))  # 定义输入形状
+conv_output = conv_layer(inputs)  # 使用 inputs 作为输入
+fc_output = fully_connected_layer(conv_output)
+final_output = activation_layer(fc_output)
 
-# 划分训练集和验证集
-train_images, val_images, train_labels, val_labels = train_test_split(images, labels, test_size=0.2, random_state=42)
+# Define the model
+model = tf.keras.Model(inputs=inputs, outputs=final_output)
 
-# 进行数据增强（示例，根据需要可以增加更多变换）
-from keras.preprocessing.image import ImageDataGenerator
+# Define the loss function and optimizer
+loss_fn = tf.keras.losses.SparseCategoricalCrossentropy()
+optimizer = tf.keras.optimizers.Adam()
 
-datagen = ImageDataGenerator(
-    rotation_range=20,      # 随机旋转角度范围
-    width_shift_range=0.1,   # 随机水平平移范围
-    height_shift_range=0.1,  # 随机垂直平移范围
-    horizontal_flip=True,    # 水平翻转
-    zoom_range=0.1           # 随机缩放范围
-)
+# Compile the model
+model.compile(optimizer=optimizer, loss=loss_fn, metrics=['accuracy'])
 
-# 对训练集数据进行增强
-datagen.fit(train_images)
+# Train the model
+epochs = 20  # 指定训练轮数
+batch_size = 32  # 指定批次大小
 
-r_channel_image_1 = images[0, :, :, 0]  # 读取第一张图片R通道的像素值（100*100）
+#model.fit(train_images, train_labels, batch_size=batch_size, epochs=epochs, validation_data=(val_images, val_labels))
 
-print(r_channel_image_1)
+# Evaluate the model
+#test_loss, test_accuracy = model.evaluate(val_images, val_labels)
+#print("Test accuracy:", test_accuracy)
 
-# 此时，train_images 和 val_images 用于训练和验证 CNN 模型的输入，train_labels 和 val_labels 是相应的标签。
+###################################################
+# Train the model and collect training history
+history = model.fit(train_images, train_labels, batch_size=batch_size, epochs=epochs, validation_data=(val_images, val_labels))
+test_loss, test_accuracy = model.evaluate(val_images, val_labels)
+print("Test accuracy:", test_accuracy)
 
-
-class ConvolutionLayer(tf.keras.layers.Layer):      # 卷积层
-
-    def __init__(self, num_filters, kernel_size, input_channels):   # 参数：卷积核数，卷积核大小，输入通道数
-        super(ConvolutionLayer, self).__init__()
-        self.num_filters = num_filters
-        self.kernel_size = kernel_size
-        self.input_channels = input_channels
-
-        self.conv_layer = tf.keras.layers.Conv2D(
-            filters=num_filters,
-            kernel_size=kernel_size,
-            strides=(1, 1),
-            padding='valid',
-            activation='relu',
-            input_shape=(None, None, input_channels)
-        )
-
-    def call(self, inputs):
-        output = self.conv_layer(inputs)
-        return output
-
-# 测试
-
-conv_layer = ConvolutionLayer(num_filters=3, kernel_size=3, input_channels=3)
-output_data = conv_layer(train_images)
+model.save('trained_model.h5')
 
 
+# Extract training and validation metrics
+train_loss = history.history['loss']
+train_accuracy = history.history['accuracy']
+val_loss = history.history['val_loss']
+val_accuracy = history.history['val_accuracy']
 
+# ... 前面的代码 ...
+
+# Define a function for calculating moving averages
+def moving_average(data, window_size):
+    cumsum = np.cumsum(data)
+    cumsum[window_size:] = cumsum[window_size:] - cumsum[:-window_size]
+    return cumsum[window_size - 1:] / window_size
+
+# Apply moving average to the recorded metrics
+window_size = 5  # You can adjust this window size
+smooth_train_loss = moving_average(train_loss, window_size)
+smooth_val_loss = moving_average(val_loss, window_size)
+smooth_train_accuracy = moving_average(train_accuracy, window_size)
+smooth_val_accuracy = moving_average(val_accuracy, window_size)
+
+# Plot loss curves with smoothed data
+plt.figure(figsize=(12, 4))
+plt.subplot(1, 2, 1)
+plt.plot(range(window_size, epochs+1), smooth_train_loss, label='Smoothed Training Loss')
+plt.plot(range(window_size, epochs+1), smooth_val_loss, label='Smoothed Validation Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.title('Loss Curves with Smoothing')
+plt.legend()
+
+# Plot accuracy curves with smoothed data
+plt.subplot(1, 2, 2)
+plt.plot(range(window_size, epochs+1), smooth_train_accuracy, label='Smoothed Training Accuracy')
+plt.plot(range(window_size, epochs+1), smooth_val_accuracy, label='Smoothed Validation Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.title('Accuracy Curves with Smoothing')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
